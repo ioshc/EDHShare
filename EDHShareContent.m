@@ -8,6 +8,12 @@
 
 #import "EDHShareContent.h"
 
+@interface EDHShareContent()
+
+@property (nonatomic) EDHShareContentType type;
+
+@end
+
 @implementation EDHShareContent
 
 - (instancetype)initWithTitle:(NSString *)title
@@ -21,6 +27,21 @@
         self.content = content;
         self.imgUrl = imgUrl;
         self.pageUrl = pageUrl;
+        self.type = EDHShareContentTypeWebPage;
+    }
+    return self;
+}
+
+- (instancetype)initWithImage:(UIImage *)image {
+
+    if (!image) {
+        return nil;
+    }
+
+    self = [super init];
+    if (self) {
+        self.image = image;
+        self.type = EDHShareContentTypeImage;
     }
     return self;
 }

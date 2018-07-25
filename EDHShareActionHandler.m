@@ -155,14 +155,27 @@ static BOOL _isWaitingForResp;//是否正在等待回调，当收到AppWillEnter
     message.description = content.content;
     [message setThumbImage:[self p_appIcon]];//分享图片,大小不能超过32K
 
-    WXWebpageObject *webObj = [WXWebpageObject object];
-    webObj.webpageUrl = content.pageUrl;
-    message.mediaObject = webObj;
+    switch (content.type) {
+        case EDHShareContentTypeWebPage: {
+
+            WXWebpageObject *webObj = [WXWebpageObject object];
+            webObj.webpageUrl = content.pageUrl;
+            message.mediaObject = webObj;
+        }
+            break;
+        case EDHShareContentTypeImage: {
+
+            WXImageObject *imageObj = [WXImageObject object];
+            imageObj.imageData = UIImagePNGRepresentation(content.image);
+            message.mediaObject = imageObj;
+        }
+            break;
+    }
 
     SendMessageToWXReq *request = [[SendMessageToWXReq alloc] init];
     request.bText = NO;//发送多媒体消息
-    request.message = message;
     request.scene = scene;
+    request.message = message;
 
     BOOL flag = [WXApi sendReq:request];
     if (!flag) {
@@ -274,23 +287,31 @@ static BOOL _isWaitingForResp;//是否正在等待回调，当收到AppWillEnter
     authReq.redirectURI = kWeiboRedirectURI;
     authReq.scope = @"all";
 
-    //由于url中的titile字段包含中文，如果直接分享给微博，微博不能将之识别问url有效部分，本可通过转码实现，但是微博限制
-    //字数为140个汉字，转码后很可能会超限，导致分享失败，顾最终解决方案是trim掉url中的中文部分，再分享到微博
-    NSArray *urlComponents = [content.pageUrl componentsSeparatedByString:@"&"];
-    NSMutableArray *mutArray = [urlComponents mutableCopy];
-    [urlComponents enumerateObjectsUsingBlock:^(NSString *obj, NSUInteger idx, BOOL * _Nonnull stop) {
-        if ([obj hasPrefix:@"title="]) {
-            [mutArray replaceObjectAtIndex:idx withObject:@"title="];
-        }
-    }];
-    NSString *chineseTrimmedUrl = [mutArray componentsJoinedByString:@"&"];
-
     WBMessageObject *message = [WBMessageObject message];
-    message.text = [NSString stringWithFormat:@"【%@】 %@",content.title,chineseTrimmedUrl];
 
-    WBImageObject *image = [WBImageObject object];
-    image.imageData = UIImagePNGRepresentation([self p_appIcon]);
-    message.imageObject = image;
+    if (content.type == EDHShareContentTypeImage) {
+        //分享图片内容
+        WBImageObject *image = [WBImageObject object];
+        image.imageData = UIImagePNGRepresentation(content.image);
+        message.imageObject = image;
+    } else {
+        //分享其他类型内容
+        //由于url中的title字段包含中文，如果直接分享给微博，微博不能将之识别问url有效部分，本可通过转码实现，但是微博限制
+        //字数为140个汉字，转码后很可能会超限，导致分享失败，顾最终解决方案是trim掉url中的中文部分，再分享到微博
+        NSArray *urlComponents = [content.pageUrl componentsSeparatedByString:@"&"];
+        NSMutableArray *mutArray = [urlComponents mutableCopy];
+        [urlComponents enumerateObjectsUsingBlock:^(NSString *obj, NSUInteger idx, BOOL * _Nonnull stop) {
+            if ([obj hasPrefix:@"title="]) {
+                [mutArray replaceObjectAtIndex:idx withObject:@"title="];
+            }
+        }];
+        NSString *chineseTrimmedUrl = [mutArray componentsJoinedByString:@"&"];
+        message.text = [NSString stringWithFormat:@"【%@】 %@",content.title,chineseTrimmedUrl];
+
+        WBImageObject *image = [WBImageObject object];
+        image.imageData = UIImagePNGRepresentation([self p_appIcon]);
+        message.imageObject = image;
+    }
 
     WBSendMessageToWeiboRequest *req = [WBSendMessageToWeiboRequest requestWithMessage:message
                                                                               authInfo:authReq
